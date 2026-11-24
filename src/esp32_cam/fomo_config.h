@@ -9,7 +9,7 @@
 
 // Switch to CAM_OPERATING_MODE_CAPTURE when collecting LEGO training photos.
 // Switch to CAM_OPERATING_MODE_INFERENCE for live city operation.
-#define CAM_MODE CAM_OPERATING_MODE_INFERENCE
+#define CAM_MODE CAM_OPERATING_MODE_CAPTURE
 
 // Set to 1 after exporting your Edge Impulse Arduino Library (.zip) into lib/
 // and updating the include header in main_cam.cpp.
@@ -19,3 +19,5 @@
 #define VISION_DEBOUNCE_FRAMES       3
 #define VISION_SCAN_INTERVAL_MS      1500
 #define CAM_SOFT_FILL_DUTY           13    // ~5% of 255 to soften Sun LED shadows
+#define CAM_FLASH_LEDC_CHANNEL       7     // Avoid collision with OV2640 XCLK (LEDC channel 0)
+#define DISABLE_BROWNOUT_DETECTOR    1     // Prevents 2s USB brownout boot-loops on ESP32-CAM-MB

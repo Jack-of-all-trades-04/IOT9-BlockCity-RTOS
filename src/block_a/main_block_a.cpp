@@ -467,7 +467,11 @@ static void taskSupabaseCloud(void* pv) {
                     http.setTimeout(3500);
                     http.addHeader("Content-Type", "application/json");
                     http.addHeader("apikey", SUPABASE_ANON_KEY);
-                    http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
+                    // Only send Authorization: Bearer for legacy JWT keys (eyJ...).
+                    // New Supabase keys (sb_publishable_... / sb_secret_...) must use apikey header only.
+                    if (strncmp(SUPABASE_ANON_KEY, "eyJ", 3) == 0) {
+                        http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
+                    }
                     http.addHeader("Prefer", "return=minimal");
                     int code = http.POST(job.body);
                     Serial.printf("[SUPABASE] POST %s -> %d\n",

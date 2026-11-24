@@ -5,6 +5,8 @@
 #include <WiFi.h>
 #include "esp_camera.h"
 #include "img_converters.h"
+#include "soc/rtc_cntl_reg.h"
+#include "soc/soc.h"
 
 #include "city_logic.h"
 #include "city_protocol.h"
@@ -338,15 +340,27 @@ static void taskVisionInference(void* pv) {
 }
 
 void setup() {
+#if DISABLE_BROWNOUT_DETECTOR
+    // Prevents spurious brownout boot-loops when powered over PC USB via ESP32-CAM-MB.
+    // Still use a dedicated 5V 2A-3A power rail for final deployment.
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+#endif
+
+    // Keep GPIO4 Flash LED OFF during camera & Wi-Fi boot to avoid current spikes
+    pinMode(CAM_FLASH_LED, OUTPUT);
+    digitalWrite(CAM_FLASH_LED, LOW);
+
     Serial.begin(115200);
-    delay(300);
+    delay(500);
     Serial.println("\n[CAM] Booting BlockCity RTOS ESP32-CAM...");
 
-    ledcAttach(CAM_FLASH_LED, PWM_FREQ_HZ, PWM_RES_BITS);
-    ledcWrite(CAM_FLASH_LED, softFillDuty);
-
     camMutex = xSemaphoreCreateMutex();
+    // Initialize OV2640 FIRST (uses LEDC_CHANNEL_0 / LEDC_TIMER_0 for XCLK)
     cameraReady = initCamera();
+
+    // Attach Flash LED on isolated LEDC channel AFTER camera init
+    ledcAttachChannel(CAM_FLASH_LED, PWM_FREQ_HZ, PWM_RES_BITS, CAM_FLASH_LEDC_CHANNEL);
+    ledcWrite(CAM_FLASH_LED, 0);
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -358,10 +372,18 @@ void setup() {
     }
     Serial.println();
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.printf("[CAM] IP: %s\n", WiFi.localIP().toString().c_str());
+        Serial.printf("[CAM] IP: http://%s/\n", WiFi.localIP().toString().c_str());
     } else {
         Serial.println("[CAM] Wi-Fi timeout — check secrets.h");
     }
+
+    // Enable soft fill light only after Wi-Fi RF init settles (0 in Capture mode until adjusted in UI)
+#if CAM_MODE == CAM_OPERATING_MODE_INFERENCE
+    ledcWrite(CAM_FLASH_LED, softFillDuty);
+#else
+    softFillDuty = 0;
+    ledcWrite(CAM_FLASH_LED, 0);
+#endif
 
     camServer.on("/", HTTP_GET, handleRoot);
     camServer.on("/capture.jpg", HTTP_GET, handleCaptureJpg);

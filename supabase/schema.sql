@@ -61,7 +61,14 @@ from public.city_telemetry
 order by created_at desc
 limit 1;
 
--- Row Level Security (RLS) for ESP32 PostgREST Anon Key Ingestion
+-- Explicit Schema, Table & Sequence Privileges (required for PostgREST anon/service_role access)
+grant usage on schema public to anon, authenticated, service_role;
+grant select, insert on public.city_telemetry to anon, authenticated, service_role;
+grant select, insert on public.building_events to anon, authenticated, service_role;
+grant select on public.latest_city_status to anon, authenticated, service_role;
+grant usage, select on all sequences in schema public to anon, authenticated, service_role;
+
+-- Row Level Security (RLS) for ESP32 PostgREST Anon / Publishable Key Ingestion
 alter table public.city_telemetry enable row level security;
 alter table public.building_events enable row level security;
 

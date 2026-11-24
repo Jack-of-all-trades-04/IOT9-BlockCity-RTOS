@@ -77,28 +77,29 @@ Arrange widgets on the Blynk Web Dashboard and Mobile App:
 4. Verify that two tables (`city_telemetry`, `building_events`) and one view (`latest_city_status`) appear under **Table Editor**.
 
 ### 3.2 Configure ESP32-1 Credentials
-1. In Supabase, navigate to **Project Settings → API**.
+1. In Supabase, navigate to **Project Settings → API Keys**.
 2. Copy:
    - **Project URL** (e.g., `https://abcdefg.supabase.co`) → `SUPABASE_URL` in `include/secrets.h`
-   - **`anon` `public` key** → `SUPABASE_ANON_KEY` in `include/secrets.h`
+   - **`Publishable` key** (`sb_publishable_...`) or legacy **`anon` `public`** JWT (`eyJ...`) → `SUPABASE_ANON_KEY` in `include/secrets.h`
+   - *(Prefer `sb_publishable_...` on ESP32 hardware rather than `sb_secret_...`, so Row Level Security stays enforced.)*
 
 ### 3.3 Test REST Ingestion from PowerShell
-Before flashing ESP32-1, confirm your Supabase table and RLS policy accept `POST` writes:
+Before flashing ESP32-1, confirm your Supabase table, `GRANT` privileges, and RLS policy accept `POST` writes.
+*(For new `sb_publishable_...` keys, send **only** the `apikey` header — adding `Authorization: Bearer sb_publishable_...` triggers HTTP 401 Invalid JWT.)*
 
 ```powershell
 $headers = @{
-    "apikey"        = "YOUR_SUPABASE_ANON_KEY"
-    "Authorization" = "Bearer YOUR_SUPABASE_ANON_KEY"
-    "Content-Type"  = "application/json"
-    "Prefer"        = "return=representation"
+    "apikey"       = "YOUR_SUPABASE_PUBLISHABLE_KEY"
+    "Content-Type" = "application/json"
+    "Prefer"       = "return=representation"
 }
 $body = @{
-    tick_count = 1
-    money = 500
-    city_aqi = 32.5
-    sun_phase = 35
+    tick_count  = 1
+    money       = 500
+    city_aqi    = 32.5
+    sun_phase   = 35
     land_a_temp = 27.4
-    land_a_hum = 61.0
+    land_a_hum  = 61.0
 } | ConvertTo-Json
 
 Invoke-RestMethod -Uri "https://YOUR-PROJECT.supabase.co/rest/v1/city_telemetry" -Method Post -Headers $headers -Body $body
