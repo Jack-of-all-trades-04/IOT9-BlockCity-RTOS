@@ -48,7 +48,14 @@ static int eiGetFeatureData(size_t offset, size_t length, float* outPtr) {
 #endif
 
 static bool initCamera() {
-    camera_config_t config;
+    // Hardware power-cycle camera sensor via PWDN to clear wedged state after reset
+    pinMode(PWDN_GPIO_NUM, OUTPUT);
+    digitalWrite(PWDN_GPIO_NUM, HIGH);
+    delay(100);
+    digitalWrite(PWDN_GPIO_NUM, LOW);
+    delay(100);
+
+    camera_config_t config = {};
     config.ledc_channel = LEDC_CHANNEL_0;
     config.ledc_timer   = LEDC_TIMER_0;
     config.pin_d0       = Y2_GPIO_NUM;
@@ -67,7 +74,8 @@ static bool initCamera() {
     config.pin_sccb_scl = SIOC_GPIO_NUM;
     config.pin_pwdn     = PWDN_GPIO_NUM;
     config.pin_reset    = RESET_GPIO_NUM;
-    config.xclk_freq_hz = 20000000;
+    config.xclk_freq_hz = 10000000; // 10 MHz is more reliable for OV2640 SCCB probe on clone boards
+    config.sccb_i2c_port = 0;
     config.pixel_format = (CAM_MODE == CAM_OPERATING_MODE_CAPTURE) ? PIXFORMAT_JPEG : PIXFORMAT_RGB565;
     config.frame_size   = FRAMESIZE_240X240;
     config.jpeg_quality = 12;
@@ -352,7 +360,8 @@ void setup() {
 
     Serial.begin(115200);
     delay(500);
-    Serial.println("\n[CAM] Booting BlockCity RTOS ESP32-CAM...");
+    Serial.printf("\n[CAM] Booting BlockCity RTOS ESP32-CAM... (PSRAM=%s, FreeHeap=%u)\n",
+                  psramFound() ? "YES" : "NO", ESP.getFreeHeap());
 
     camMutex = xSemaphoreCreateMutex();
     // Initialize OV2640 FIRST (uses LEDC_CHANNEL_0 / LEDC_TIMER_0 for XCLK)
@@ -362,7 +371,11 @@ void setup() {
     ledcAttachChannel(CAM_FLASH_LED, PWM_FREQ_HZ, PWM_RES_BITS, CAM_FLASH_LEDC_CHANNEL);
     ledcWrite(CAM_FLASH_LED, 0);
 
+    WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
+    // Reduce Wi-Fi TX peak current to prevent 5V rail sag / Core 1 panic on USB power
+    WiFi.setTxPower(WIFI_POWER_11dBm);
+    delay(200);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     Serial.printf("[CAM] Connecting to Wi-Fi %s", WIFI_SSID);
     uint32_t start = millis();
